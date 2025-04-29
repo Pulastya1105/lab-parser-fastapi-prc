@@ -1,0 +1,68 @@
+import re
+
+def parse_lab_text(text: str):
+    lab_tests = []
+    lines = [line.strip() for line in text.split('\n') if line.strip()]
+    
+    pattern_full = re.compile(
+        r"(?P<name>[A-Za-z0-9\(\)\-\/\+\.\s]+?)\s+(?P<value>-?\d+\.?\d*)\s*(?P<unit>[a-zA-Z\^\/\d\%\.\-]*)\s+(?P<range>\d+\.?\d*\s*[-–]\s*\d+\.?\d*)"
+    )
+    pattern_value_only = re.compile(
+        r"(?P<name>[A-Za-z0-9\(\)\-\/\+\.\s]+?)\s+(?P<value>-?\d+\.?\d*)\s*(?P<unit>[a-zA-Z\^\/\d\%\.\-]*)"
+    )
+    pattern_range_only = re.compile(
+        r"(?P<range>\d+\.?\d*)\s*[-–]\s*(?P<high>\d+\.?\d*)"
+    )
+
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+
+        match_full = pattern_full.match(line)
+        if match_full:
+            name = match_full.group("name").strip()
+            value = float(match_full.group("value"))
+            unit = match_full.group("unit").strip()
+            ref_range = match_full.group("range").strip()
+            ref_low, ref_high = map(float, re.findall(r"\d+\.?\d*", ref_range))
+            out_of_range = value < ref_low or value > ref_high
+
+            lab_tests.append({
+                "test_name": name,
+                "value": value,
+                "unit": unit,
+                "reference_range": ref_range,
+                "lab_test_out_of_range": out_of_range
+            })
+            i += 1
+            continue
+
+        match_val = pattern_value_only.match(line)
+        if match_val:
+            name = match_val.group("name").strip()
+            value = float(match_val.group("value"))
+            unit = match_val.group("unit").strip()
+            ref_range = ""
+            out_of_range = False
+
+            if i + 1 < len(lines):
+                next_line = lines[i+1]
+                match_range = pattern_range_only.search(next_line)
+                if match_range:
+                    ref_low = float(match_range.group(1))
+                    ref_high = float(match_range.group(2))
+                    ref_range = f"{ref_low} - {ref_high}"
+                    out_of_range = value < ref_low or value > ref_high
+                    i += 1
+
+            lab_tests.append({
+                "test_name": name,
+                "value": value,
+                "unit": unit,
+                "reference_range": ref_range,
+                "lab_test_out_of_range": out_of_range
+            })
+
+        i += 1
+
+    return lab_tests
